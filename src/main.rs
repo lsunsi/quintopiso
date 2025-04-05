@@ -1,3 +1,10 @@
+use std::collections::HashSet;
+
+mod fetch;
+mod save;
+
 fn main() {
-    println!("Hello, world!");
+    let response = fetch::fetch();
+    println!("fetched len={}", response.len());
+    save::save(response);
 }

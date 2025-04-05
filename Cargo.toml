@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+rusqlite = { version = "0.34.0", default-features = false }
+serde = { version = "1.0.219", features = ["derive"], default-features = false }
+ureq = { version = "3.0.10", features = ["json", "rustls"], default-features = false }
