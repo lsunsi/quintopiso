@@ -118,7 +118,7 @@ ORDER BY version DESC;";
 
 const UPDATE_SEEN: &str = "
 UPDATE imoveis
-SET last_seen_at = CURRENT_TIMESTAMP
+SET active = 1, last_seen_at = CURRENT_TIMESTAMP
 WHERE id = ?1;";
 
 const INSERT_ACTIVE: &str = "
