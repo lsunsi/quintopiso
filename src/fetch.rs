@@ -1,67 +1,84 @@
 use serde::Deserialize;
-use std::collections::HashMap;
+const PAGE_SIZE: u32 = 100;
 
-pub fn fetch() -> Vec<ResponseHit> {
-    let mut hits = HashMap::new();
+pub fn fetch() -> Vec<ResponseHitSource> {
+    let mut items = Vec::new();
 
     for page in 0.. {
-        dbg!(page);
+        let response = fetch_page(PAGE_SIZE, page);
 
-        let response = fetch_page(page);
+        println!(
+            "fetched\t{} / {}\t{}%",
+            page * PAGE_SIZE,
+            response.hits.total.value,
+            page * PAGE_SIZE * 100 / response.hits.total.value,
+        );
+
         let len = response.hits.hits.len();
-
         for hit in response.hits.hits {
-            if hits.insert(hit.source.id, hit).is_some() {
-                println!("se liga tá deduplicando");
-            }
+            items.push(hit.source);
         }
 
-        if len < 1000 {
+        if len < PAGE_SIZE as usize {
             break;
         }
 
-        std::thread::sleep(std::time::Duration::from_secs(1));
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
-    hits.into_values().collect()
+    let prelen = items.len();
+    items.sort_by_key(|i: &ResponseHitSource| i.id);
+    items.dedup_by_key(|i| i.id);
+
+    println!("deduped {} items", prelen - items.len());
+
+    items
 }
 
-fn fetch_page(page: u32) -> Response {
-    let mut response = ureq::get(String::from(URL) + &(page * 1000).to_string())
+fn fetch_page(page_size: u32, page: u32) -> Response {
+    let mut response = ureq::get(url(page_size, page))
         .call()
         .expect("request falhou rede");
 
-    if !response.status().is_success() {
-        panic!("request falhou status");
-    }
+    assert!(response.status().is_success(), "request falhou status");
 
     response
         .body_mut()
-        .read_json::<Response>()
+        .read_json()
         .expect("request falhou corpo")
 }
 
+fn url(page_size: u32, page: u32) -> String {
+    use std::fmt::Write;
+    let offset = page * page_size;
+    let mut url = String::from(URL);
+    write!(url, "page_size={page_size}&offset={offset}").expect("url");
+    url
+}
+
 #[derive(Debug, Deserialize)]
-pub struct Response {
-    took: u32,
+struct Response {
     hits: ResponseHits,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ResponseHits {
+struct ResponseHits {
+    total: ResponseHitsTotal,
     hits: Vec<ResponseHit>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct ResponseHit {
-    #[serde(rename = "_score")]
-    pub score: f64,
-    #[serde(rename = "_source")]
-    pub source: ResponseHitSource,
-    pub fields: Option<ResponseHitFields>,
+struct ResponseHitsTotal {
+    value: u32,
 }
 
 #[derive(Debug, Deserialize)]
+struct ResponseHit {
+    #[serde(rename = "_source")]
+    source: ResponseHitSource,
+}
+
+#[derive(Debug, Deserialize, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseHitSource {
     pub id: u32,
@@ -70,76 +87,44 @@ pub struct ResponseHitSource {
     pub sale_price: u32,
     pub iptu_plus_condominium: u32,
     pub area: Option<u32>,
-    pub image_list: Option<Vec<String>>,
     pub address: String,
     pub region_name: String,
     pub city: String,
-    pub visit_status: ResponseHitSourceVisit,
-    #[serde(rename = "type")]
-    pub kind: Option<ResponseHitSourceKind>,
-    pub for_rent: ResponseHitSourceCornoBool,
-    pub for_sale: Option<ResponseHitSourceCornoBool>,
+    pub visit_status: String,
+    pub r#type: Option<String>,
+    pub for_rent: Boolorstr,
+    pub for_sale: Option<Boolorstr>,
     pub is_primary_market: Option<bool>,
     pub bedrooms: Option<u8>,
     pub parking_spaces: Option<u8>,
     pub neighbourhood: String,
     pub bathrooms: Option<u8>,
-    pub is_furnished: Option<ResponseHitSourceCornoBool>,
+    pub is_furnished: Option<Boolorstr>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-pub enum ResponseHitSourceVisit {
-    AcceptAlways,
-    AcceptNew,
-    Blocked,
-}
-
-#[derive(Debug, Deserialize)]
-pub enum ResponseHitSourceKind {
-    StudioOuKitchenette,
-    CasaCondominio,
-    Apartamento,
-    Casa,
-}
-
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Hash)]
 #[serde(untagged)]
-pub enum ResponseHitSourceCornoBool {
+pub enum Boolorstr {
+    Str(Boolstr),
     Bool(bool),
-    Corno(ResponseHitSourceFurnishedCorno),
 }
 
-impl ResponseHitSourceCornoBool {
+impl Boolorstr {
     pub fn to_int(self) -> u8 {
         match self {
-            ResponseHitSourceCornoBool::Bool(b) => match b {
-                true => 1,
-                false => 0,
-            },
-            ResponseHitSourceCornoBool::Corno(corno) => match corno {
-                ResponseHitSourceFurnishedCorno::False => 0,
-                ResponseHitSourceFurnishedCorno::True => 1,
-            },
+            Boolorstr::Bool(true) | Boolorstr::Str(Boolstr::True) => 1,
+            Boolorstr::Bool(false) | Boolorstr::Str(Boolstr::False) => 0,
         }
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
-pub enum ResponseHitSourceFurnishedCorno {
+pub enum Boolstr {
     False,
     True,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ResponseHitFields {
-    pub listing_tags: Vec<String>,
-}
-
-// -19.9121089,-43.9149629
-// -19.9560299,-43.9758439,
 const URL: &str = "https://www.quintoandar.com.br/api/yellow-pages/v2/search?\
 map[bounds_north]=-19.9121089&\
 map[bounds_south]=-19.95602996&\
@@ -175,6 +160,4 @@ return=neighbourhood&\
 return=categories&\
 return=bathrooms&\
 return=isFurnished&\
-return=installations&\
-page_size=1000&\
-offset=";
+return=installations&";
