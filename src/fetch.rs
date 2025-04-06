@@ -125,11 +125,13 @@ pub enum Boolstr {
     True,
 }
 
+// jardel autopeças @-19.9045122,-43.9130375
+// makebleck loja de maquiagem @-19.9647567,-44.0089787
 const URL: &str = "https://www.quintoandar.com.br/api/yellow-pages/v2/search?\
-map[bounds_north]=-19.9121089&\
-map[bounds_south]=-19.95602996&\
-map[bounds_east]=-43.9149629&\
-map[bounds_west]=-43.9758439&\
+map[bounds_north]=-19.9045122&\
+map[bounds_east]=-43.9130375&\
+map[bounds_south]=-19.9647567&\
+map[bounds_west]=-44.0089787&\
 availability=any&\
 occupancy=any&\
 business_context=SALE&\
