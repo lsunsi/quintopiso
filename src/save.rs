@@ -110,7 +110,11 @@ CREATE TABLE IF NOT EXISTS imoveis (
     parking_spaces INTEGER CHECK (parking_spaces >= 0),
     neighbourhood TEXT NOT NULL  CHECK (length(neighbourhood) >= 0),
     bathrooms INTEGER CHECK (bathrooms >= 0),
-    is_furnished INTEGER CHECK (is_furnished IN (0, 1))
+    is_furnished INTEGER CHECK (is_furnished IN (0, 1)),
+
+    link TEXT GENERATED ALWAYS AS (concat('https://quintoandar.com.br/imovel/', id, '/comprar')) STORED,
+    last_seen_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
+    created_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED
 );";
 
 const INACTIVATE_ALL: &str = "
