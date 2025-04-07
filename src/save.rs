@@ -17,6 +17,11 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
     let mut new_version = 0;
     let mut new_entry = 0;
 
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("ts")
+        .as_secs();
+
     for hit in hits {
         let mut hasher = std::hash::DefaultHasher::new();
         hit.hash(&mut hasher);
@@ -48,6 +53,9 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
                     hit.id,
                     hash,
                     version,
+                    1,
+                    ts,
+                    ts,
                     hit.rent,
                     hit.total_cost,
                     hit.sale_price,
@@ -81,9 +89,9 @@ CREATE TABLE IF NOT EXISTS imoveis (
     id INTEGER NOT NULL,
     hash INTEGER NOT NULL,
     version INTEGER NOT NULL,
-    active INTEGER NOT NULL CHECK (active IN (0, 1)) DEFAULT 1,
-    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    active INTEGER NOT NULL CHECK (active IN (0, 1)),
+    created_at INTEGER NOT NULL,
+    last_seen_at INTEGER NOT NULL,
 
     rent INTEGER NOT NULL CHECK (rent >= 0),
     total_cost INTEGER NOT NULL CHECK (total_cost >= 0),
@@ -126,6 +134,9 @@ INSERT INTO imoveis (
     id,
     hash,
     version,
+    active,
+    created_at,
+    last_seen_at,
     rent,
     total_cost,
     sale_price,
@@ -144,4 +155,4 @@ INSERT INTO imoveis (
     neighbourhood,
     bathrooms,
     is_furnished
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21);";
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24);";
