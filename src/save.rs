@@ -114,7 +114,8 @@ CREATE TABLE IF NOT EXISTS imoveis (
 
     link TEXT GENERATED ALWAYS AS (concat('https://quintoandar.com.br/imovel/', id, '/comprar')) STORED,
     last_seen_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
-    created_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED
+    created_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
+    m2_sale_price INTEGER GENERATED ALWAYS AS (sale_price / area) STORED
 );";
 
 const INACTIVATE_ALL: &str = "
