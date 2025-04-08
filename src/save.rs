@@ -35,7 +35,7 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
 
         if current_hash.is_some_and(|h| hash == h) {
             already_known += 1;
-            tx.execute(UPDATE_SEEN, (hit.id,)).expect("db update");
+            tx.execute(UPDATE_SEEN, (hit.id, ts)).expect("db update");
         } else {
             let version = match current_version {
                 Some(v) => {
@@ -131,7 +131,7 @@ ORDER BY version DESC;";
 
 const UPDATE_SEEN: &str = "
 UPDATE imoveis
-SET active = 1, last_seen_at = CURRENT_TIMESTAMP
+SET active = 1, last_seen_at = ?2
 WHERE id = ?1;";
 
 const INSERT_ACTIVE: &str = "
