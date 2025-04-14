@@ -4,23 +4,23 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
     use rusqlite::OptionalExtension;
     use std::hash::Hash;
 
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("ts")
+        .as_secs();
+
     let mut conn = rusqlite::Connection::open(path).expect("db open");
     conn.execute(CREATE_TABLE, ()).expect("db create");
 
     let mut tx = conn.transaction().expect("tx create");
     tx.set_drop_behavior(rusqlite::DropBehavior::Commit);
 
-    tx.execute(INACTIVATE_ALL, ()).expect("db setup");
+    let inactivated = tx.execute(INACTIVATE_ALL, (ts,)).expect("db setup");
     let mut insert = tx.prepare(INSERT_ACTIVE).expect("db prepare");
 
     let mut already_known = 0;
     let mut new_version = 0;
     let mut new_entry = 0;
-
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("ts")
-        .as_secs();
 
     for hit in hits {
         let mut hasher = std::hash::DefaultHasher::new();
@@ -79,9 +79,10 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
         }
     }
 
-    println!("saved already known = {already_known}");
-    println!("saved new versions = {new_version}");
-    println!("saved new entries = {new_entry}");
+    println!("duplicates = {already_known}");
+    println!("updated = {new_version}");
+    println!("created = {new_entry}");
+    println!("inactive = {}", inactivated - new_version - already_known);
 }
 
 const CREATE_TABLE: &str = "
@@ -89,9 +90,9 @@ CREATE TABLE IF NOT EXISTS imoveis (
     id INTEGER NOT NULL,
     hash INTEGER NOT NULL,
     version INTEGER NOT NULL,
-    active INTEGER NOT NULL CHECK (active IN (0, 1)),
     created_at INTEGER NOT NULL,
-    last_seen_at INTEGER NOT NULL,
+    active_until INTEGER NOT NULL,
+    inactive_since INTEGER,
 
     rent INTEGER NOT NULL CHECK (rent >= 0),
     total_cost INTEGER NOT NULL CHECK (total_cost >= 0),
@@ -113,15 +114,16 @@ CREATE TABLE IF NOT EXISTS imoveis (
     is_furnished INTEGER CHECK (is_furnished IN (0, 1)),
 
     link TEXT GENERATED ALWAYS AS (concat('https://quintoandar.com.br/imovel/', id, '/comprar')) STORED,
-    last_seen_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
+    active_until_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
     created_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
-    m2_sale_price INTEGER GENERATED ALWAYS AS (sale_price / area) STORED
+    m2_sale_price INTEGER GENERATED ALWAYS AS (sale_price / area) STORED,
+    active INTEGER GENERATED ALWAYS AS (inactive_since IS NULL) STORED
 );";
 
 const INACTIVATE_ALL: &str = "
 UPDATE imoveis
-SET active = 0
-WHERE active = 1;";
+SET inactive_since = ?1
+WHERE inactive_since IS NULL;";
 
 const FIND_LATEST: &str = "
 SELECT hash, version
@@ -131,7 +133,7 @@ ORDER BY version DESC;";
 
 const UPDATE_SEEN: &str = "
 UPDATE imoveis
-SET active = 1, last_seen_at = ?2
+SET inactive_since = NULL, active_until = ?2
 WHERE id = ?1;";
 
 const INSERT_ACTIVE: &str = "
@@ -139,9 +141,8 @@ INSERT INTO imoveis (
     id,
     hash,
     version,
-    active,
     created_at,
-    last_seen_at,
+    active_until,
     rent,
     total_cost,
     sale_price,
@@ -160,4 +161,4 @@ INSERT INTO imoveis (
     neighbourhood,
     bathrooms,
     is_furnished
-) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24);";
+) VALUES (?1, ?2, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24);";
