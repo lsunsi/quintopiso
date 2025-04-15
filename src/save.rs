@@ -35,7 +35,8 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
 
         if current_hash.is_some_and(|h| hash == h) {
             already_known += 1;
-            tx.execute(UPDATE_SEEN, (hit.id, ts)).expect("db update");
+            tx.execute(UPDATE_SEEN, (hit.id, current_version, ts))
+                .expect("db update");
         } else {
             let version = match current_version {
                 Some(v) => {
@@ -53,7 +54,6 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
                     hit.id,
                     hash,
                     version,
-                    1,
                     ts,
                     ts,
                     hit.rent,
@@ -80,9 +80,9 @@ pub fn save(hits: Vec<crate::fetch::ResponseHitSource>, path: &str) {
     }
 
     println!("duplicates = {already_known}");
+    println!("inactivated = {inactivated}");
     println!("updated = {new_version}");
     println!("created = {new_entry}");
-    println!("inactive = {}", inactivated - new_version - already_known);
 }
 
 const CREATE_TABLE: &str = "
@@ -117,7 +117,9 @@ CREATE TABLE IF NOT EXISTS imoveis (
     active_until_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
     created_at_str TEXT GENERATED ALWAYS AS (DATETIME(created_at, 'unixepoch')) STORED,
     m2_sale_price INTEGER GENERATED ALWAYS AS (sale_price / area) STORED,
-    active INTEGER GENERATED ALWAYS AS (inactive_since IS NULL) STORED
+    active INTEGER GENERATED ALWAYS AS (inactive_since IS NULL) STORED,
+
+    PRIMARY KEY (id, version)
 );";
 
 const INACTIVATE_ALL: &str = "
@@ -129,12 +131,13 @@ const FIND_LATEST: &str = "
 SELECT hash, version
 FROM imoveis
 WHERE id = ?1
-ORDER BY version DESC;";
+ORDER BY version DESC
+LIMIT 1;";
 
 const UPDATE_SEEN: &str = "
 UPDATE imoveis
-SET inactive_since = NULL, active_until = ?2
-WHERE id = ?1;";
+SET inactive_since = NULL, active_until = ?3
+WHERE id = ?1 and version = ?2";
 
 const INSERT_ACTIVE: &str = "
 INSERT INTO imoveis (
@@ -161,4 +164,4 @@ INSERT INTO imoveis (
     neighbourhood,
     bathrooms,
     is_furnished
-) VALUES (?1, ?2, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24);";
+) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23);";
